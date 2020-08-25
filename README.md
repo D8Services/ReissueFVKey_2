@@ -32,8 +32,12 @@ phraseKey
 - ReIssue FV2 Key  
 ### Frequency   
 - Once every week  
+or  
+- Ongoing if Self Service Trigger  
 ### Trigger     
 - Reoccuring check-in  
+or  
+- Self Service  
 ### Scope       
 - All Computers  
 ### Payload     
