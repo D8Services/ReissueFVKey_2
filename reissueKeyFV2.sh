@@ -39,8 +39,23 @@
 #
 # This script will prompt the user for their password so a new FV2 individual
 # recovery key can be issued and redirected to the JSS.
+# https://github.com/D8Services/ReissueFVKey_2
 #
 ####################################################################################################
+####################################################################################################
+#
+# D8 Disclaimer
+#
+# This script has been modified heavily from the original available on Jamf's Github Page
+#
+# By using this script you are accepting all responsibility and in no way will hold anyone else responsible
+# neither the author, Jamf nor D8 Services.
+#
+# We provide this script as is and offer no support, unless prior agreement has been made.
+# 
+# https://github.com/D8Services/ReissueFVKey_2
+#
+
 #
 # HISTORY
 #
