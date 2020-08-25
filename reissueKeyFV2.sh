@@ -55,7 +55,8 @@
 # 
 # https://github.com/D8Services/ReissueFVKey_2
 #
-
+#
+####################################################################################################
 #
 # HISTORY
 #
@@ -80,7 +81,7 @@
 # - Added Custom Branding to pop up windows
 # -Updated by Tomos Tyler on 19 August 2020
 # - Added LaunchD process for display Dialog
-# - Updated to take user password, encrypt it, create a new account
+# - Updated to take user password, encrypt it, create a new account if missing
 # - with FV Access (Secure Token) for future use
 ####################################################################################################
 #
