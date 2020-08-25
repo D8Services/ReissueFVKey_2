@@ -49,7 +49,6 @@ phraseKey
 - Update Inventory  
 
 ## Further Automated Randomisation
-[See RandomPasswordv3.sh ](https://github.com/D8Services/RandomAccountPassword/tree/DoNotEraseUser)
+We referred above to our Random Password workflow, for more information, [See RandomPasswordv3.sh](https://github.com/D8Services/RandomAccountPassword/tree/DoNotEraseUser)  
 
-Collecting PAssword and store in ClearText within Jamf (CAUTION this could violate your corporate password policy)
-[See RandomPassEA_v3.sh ](https://github.com/D8Services/RandomAccountPassword/tree/DoNotEraseUser)
+Collecting Password and store it in in ClearText within Jamf (CAUTION this could violate your corporate password policy) [See RandomPassEA_v3.sh](https://github.com/D8Services/RandomAccountPassword/tree/DoNotEraseUser)
