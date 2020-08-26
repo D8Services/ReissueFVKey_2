@@ -83,7 +83,8 @@
 # - Added LaunchD process for display Dialog
 # - Updated to take user password, encrypt it, create a new account if missing
 # - with FV Access (Secure Token) for future use
-# - Altered to see if the local Password and details are OK, if so, avoid talking to end user.
+# -Updated to 2.1
+# - Altered to see if the local Password and details are OK, if so, stop talking to end user.
 ####################################################################################################
 #
 # Parameter 4 = Set organization name in pop up window
