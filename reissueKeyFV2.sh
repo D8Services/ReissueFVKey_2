@@ -83,6 +83,7 @@
 # - Added LaunchD process for display Dialog
 # - Updated to take user password, encrypt it, create a new account if missing
 # - with FV Access (Secure Token) for future use
+# - Altered to see if the local Password and details are OK, if so, avoid talking to end user.
 ####################################################################################################
 #
 # Parameter 4 = Set organization name in pop up window
@@ -108,7 +109,7 @@ fileVaultIcon="/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/
 # For Passing FVPrefs to another user
 prefFile="/var/db/.encryptedD8.plist"
 log_location="/var/log/d8ReissueKey.log"
-Version="2.0"
+Version="2.1"
 FullScriptName=$(basename "${0}")
 
 #saltKey="063f7f8eb687cde2"
@@ -187,14 +188,6 @@ currentUID=$(dscl . read /Users/$userName UniqueID | awk '{print $2}')
 
 ## Get the OS version
 OS=`/usr/bin/sw_vers -productVersion | awk -F. {'print $2'}`
-
-## This first user check sees if the logged in account is already authorized with FileVault 2
-userCheck=`fdesetup list | awk -v usrN="$userNameUUID" -F, 'match($0, usrN) {print $1}'`
-if [ "${userCheck}" != "${userName}" ]; then
-    echo "This user is not a FileVault 2 enabled user."
-    ScriptLogging "This user is not a FileVault 2 enabled user."
-    exit 3
-fi
 
 ## Counter for Attempts
 try=0
@@ -326,8 +319,9 @@ else
     fi
 fi
 done
+}
 
-
+RequestNewKey() {
 try=$((try+1))
 if [[ $OS -ge 9 ]] &&  [[ $OS -lt 13 ]]; then
 ## This "expect" block will populate answers for the fdesetup prompts that normally occur while hiding them from output
@@ -392,12 +386,54 @@ end run
 }
 
 ScriptLogging "********* Starting Main Process *********"
+----------------------
+if [[ -f "${prefFile}" ]];then
+    ScriptLogging "Checking Account Credentials."
+    encryptedPass=$(defaults read "${prefFile}" pkey)
+    newPass=$(DecryptString "${encryptedPass}")
+    passLocalCheck=$(dscl . -authonly ${localName} ${newPass}; echo $?)
+    skipUser="000"
+    if [ "$passLocalCheck" -eq 0 ]; then
+        echo "Password OK for user \"${localName}\""
+        ScriptLogging "Password validation sucessful for user \"${localName}\""
+        skipUser="01"
+    else
+        ScriptLogging "Password failed to authenticate for user \"${localName}\""
+    fi
+    ScriptLogging "Checking Account Token."
+    tokenStatus=$(sysadminctl -secureTokenStatus ${localName} 2>&1 | awk '{print$7}')
+    if [[ $tokenStatus != "ENABLED" ]];then
+        echo "Token assignment failed"
+        ScriptLogging "Token assignment check failed"
+    else
+        ScriptLogging "The Account \"${localName}\" has a secure token."
+        skipUser="10"
+    fi
+else
+    ## This first user check sees if the logged in account is already authorized with FileVault 2
+    ScriptLogging "Preference File is missing, reverting to checking the end user."
+userCheck=`fdesetup list | awk -v usrN="$userNameUUID" -F, 'match($0, usrN) {print $1}'`
+    skipUser="00"
+    if [ "${userCheck}" != "${userName}" ]; then
+        echo "This user is not a FileVault 2 enabled user."
+        ScriptLogging "This user is not a FileVault 2 enabled user."
+        exit 3
+    fi
+fi
+---------------------
 while true
 do
-    passwordPrompt
-    if [[ ${skipAccountCheck} == "No" ]];then
-        checkITUser
+    if [[ "${skipUser}" -gt 0 ]];then
+        ScriptLogging "Sucessfully tested local Admin. Ignoring end user."
+        userName=${localName}
+        userPass=${newPass}
+    else
+        passwordPrompt
+        if [[ ${skipAccountCheck} == "No" ]];then
+            checkITUser
+        fi
     fi
+    RequestNewKey
     if [[ $result = *"Error"* ]];then
         ScriptLogging "Error Changing Key"
         echo "Error Changing Key"
@@ -423,4 +459,5 @@ do
         exit 0
     fi
 done
+
 
