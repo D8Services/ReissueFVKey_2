@@ -83,8 +83,7 @@
 # - Added LaunchD process for display Dialog
 # - Updated to take user password, encrypt it, create a new account if missing
 # - with FV Access (Secure Token) for future use
-# -Updated to 2.1
-# - Altered to see if the local Password and details are OK, if so, stop talking to end user.
+# - Altered to see if the local Password and details are OK, if so, avoid talking to end user.
 ####################################################################################################
 #
 # Parameter 4 = Set organization name in pop up window
@@ -245,13 +244,13 @@ checkITUser() {
     if id "$localName" >/dev/null 2>&1; then
         echo "Notice: IT Admin user exists, continuing"
         ScriptLogging "Notice: IT Admin user exists, continuing"
-        if [[ ! -e ${prefFile} ]];then
+        if [[ ! -f ${prefFile} ]];then
             echo "missing prefFile."
             ScriptLogging "Missing LocalUser Pref File. Creating, and populating with encrypted password."
             newPass=`cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1`
             encryptedString=$(GenerateEncryptedString "${newPass}")
             defaults write "${prefFile}" pkey "${encryptedString}"
-            ScriptLogging "Resetting Password for \"${localUser}\""
+            ScriptLogging "Resetting Password for \"${localName}\""
             sysadminctl -resetPasswordFor "${localName}" -password "${newPass}" -adminUser "${userName}" -adminPassword "${userPass}"
         else
             ScriptLogging "Preference File Found for $localName. Decrypting."
@@ -290,11 +289,19 @@ checkITUser() {
         ScriptLogging "Password validation sucessful for user \"${localName}\""
     else
         ScriptLogging "Password failed to authenticate for user \"${localName}\""
+        ScriptLogging "Suggest we Erase this user and start again."
+        newPass=`cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1`
+        sysadminctl -deleteUser ${localName}
+        sysadminctl -addUser ${localName} -fullName "${localFullName}" -UID 500 -password ${newPass} -home ${home} -admin -adminUser "${userName}" -adminPassword "${userPass}"
+        sysadminctl -secureTokenOn ${localName} -password "${newPass}" -adminUser "${userName}" -adminPassword "${userPass}"
+        createhomedir -c 2>&1
+        encryptedString=$(GenerateEncryptedString "${newPass}")
+        defaults write "${prefFile}" pkey "${encryptedString}"
     fi
 }
 
 passwordRequest() {
-ScriptLogging "Requesting \"userName\" password."
+ScriptLogging "Requesting \"${userName}\" password."
 userPass=$(launchctl "asuser" "$currentUID" /usr/bin/osascript -e "
 display dialog \"${1}\" default answer \"\" with hidden answer buttons {\"OK\"} default button 1 with icon POSIX file \"$brandIcon\"
 return text returned of result
@@ -393,13 +400,16 @@ if [[ -f "${prefFile}" ]];then
     encryptedPass=$(defaults read "${prefFile}" pkey)
     newPass=$(DecryptString "${encryptedPass}")
     passLocalCheck=$(dscl . -authonly ${localName} ${newPass}; echo $?)
-    skipUser="000"
+    skipUser="100"
     if [ "$passLocalCheck" -eq 0 ]; then
         echo "Password OK for user \"${localName}\""
-        ScriptLogging "Password validation sucessful for user \"${localName}\""
-        skipUser="01"
+        ScriptLogging "Password validation successful for user \"${localName}\""
+        skipUser="10"
     else
         ScriptLogging "Password failed to authenticate for user \"${localName}\""
+        ScriptLogging "Need to Reset the Password for \"${localName}\""
+        rm -f "${prefFile}"
+        skipUser="0"
     fi
     ScriptLogging "Checking Account Token."
     tokenStatus=$(sysadminctl -secureTokenStatus ${localName} 2>&1 | awk '{print$7}')
@@ -408,13 +418,18 @@ if [[ -f "${prefFile}" ]];then
         ScriptLogging "Token assignment check failed"
     else
         ScriptLogging "The Account \"${localName}\" has a secure token."
-        skipUser="10"
+        if [[ "${skipUser}" -eq "0" ]];then
+            skipUser="0"
+            ScriptLogging "Identified error in Password Validation."
+        else
+            skipUser="10"
+        fi
     fi
 else
     ## This first user check sees if the logged in account is already authorized with FileVault 2
     ScriptLogging "Preference File is missing, reverting to checking the end user."
 userCheck=`fdesetup list | awk -v usrN="$userNameUUID" -F, 'match($0, usrN) {print $1}'`
-    skipUser="00"
+    skipUser="0"
     if [ "${userCheck}" != "${userName}" ]; then
         echo "This user is not a FileVault 2 enabled user."
         ScriptLogging "This user is not a FileVault 2 enabled user."
@@ -424,11 +439,12 @@ fi
 ---------------------
 while true
 do
-    if [[ "${skipUser}" -gt 0 ]];then
+    if [[ "${skipUser}" -ge "1" ]];then
         ScriptLogging "Sucessfully tested local Admin. Ignoring end user."
         userName=${localName}
         userPass=${newPass}
     else
+        ScriptLogging "Password or account values error, challenging end user."
         passwordPrompt
         if [[ ${skipAccountCheck} == "No" ]];then
             checkITUser
